@@ -1,4 +1,4 @@
-package pavlomi.poloniex.domain.dto
+package pavlomi.poloniex.domain.dto.publicapi
 
 import pavlomi.poloniex.domain._
 
