@@ -9,10 +9,11 @@ import akka.http.scaladsl.model.Uri.Query
 import akka.stream.Materializer
 import enumeratum.values.{IntEnum, IntEnumEntry, StringEnum, StringEnumEntry}
 import pavlomi.poloniex.PoloniexPublicApi.Period
-import pavlomi.poloniex.domain.PoloniexCurrencyPair
+import pavlomi.poloniex.domain.{PoloniexCurrency, PoloniexCurrencyPair}
 import pavlomi.poloniex.domain.dto._
 import pavlomi.poloniex.domain.dto.publicapi.{ReturnChartDataResponse, ReturnTicket, ReturnTicketResponse}
 import spray.json._
+
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -23,6 +24,8 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
 
   /**
    * Returns the ticker for all markets.
+   *
+   * Call: https://poloniex.com/public?command=returnTicker
    */
   def returnTicket(): PoloniexResponse[ReturnTicketResponse] = {
     val method = PoloniexPublicApi.Method.ReturnTicker.value
@@ -35,7 +38,47 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
   }
 
   /**
+   * Returns the 24-hour volume for all markets, plus totals for primary currencies.
+   *
+   * Call: https://poloniex.com/public?command=return24hVolume
+   */
+  def return24Volume() = {
+    val method = PoloniexPublicApi.Method.Return24Value.value
+    ???
+  }
+
+  /**
+   * Returns the order book for a given market, as well as a sequence number for use with the Push API and an indicator specifying whether the market is frozen.
+   * You may set currencyPair to "all" to get the order books of all markets.
+   *
+   * Call: https://poloniex.com/public?command=returnOrderBook&currencyPair=BTC_NXT&depth=10
+   */
+  def returnOrderBook(
+    currencyPair: PoloniexCurrencyPair,
+    depth: Int
+  ) = {
+    val method = PoloniexPublicApi.Method.ReturnOrderBook.value
+    ???
+  }
+
+  /**
+   * Returns the past 200 trades for a given market, or up to 50,000 trades between a range specified in UNIX timestamps by the "start" and "end" GET parameters
+   *
+   * Call: https://poloniex.com/public?command=returnTradeHistory&currencyPair=BTC_NXT&start=1410158341&end=1410499372
+   */
+  def returnTradeHistory(
+    start: Instant,
+    end: Instant,
+    currencyPair: PoloniexCurrencyPair,
+  ) = {
+    val method = PoloniexPublicApi.Method.ReturnTradeHistory.value
+    ???
+  }
+
+  /**
    * Returns candlestick chart data.
+   *
+   * Call: https://poloniex.com/public?command=returnChartData&currencyPair=BTC_XMR&start=1405699200&end=9999999999&period=14400
    */
   def returnChartData(
     start: Instant,
@@ -57,6 +100,26 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
     val httpRequest = HttpRequest(HttpMethods.GET, uri)
 
 //    http().singleRequest(httpRequest).flatMap(parseHttpResponse(_))
+    ???
+  }
+
+  /**
+   * Returns information about currencies.
+   *
+   * Call: https://poloniex.com/public?command=returnCurrencies
+   */
+  def returnCurrencies() = {
+    val method = PoloniexPublicApi.Method.ReturnCurrencies.value
+    ???
+  }
+
+  /**
+   * Returns the list of loan offers and demands for a given currency, specified by the "currency" GET parameter.
+   *
+   * Call: https://poloniex.com/public?command=returnLoanOrders&currency=BTC
+   */
+  def returnLoadOrders(currency: PoloniexCurrency) = {
+    val method = PoloniexPublicApi.Method.ReturnLoadOrders.value
     ???
   }
 
