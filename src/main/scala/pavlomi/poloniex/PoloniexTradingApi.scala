@@ -124,39 +124,157 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
     ???
   }
 
-  def moveOrder = ???
+  /**
+   * Cancels an order and places a new one of the same type in a single atomic transaction, meaning either both operations will succeed or both will fail.
+   */
+  def moveOrder = {
+    val method = PoloniexTradingApi.Method.MoveOrder.value
+    ???
+  }
 
-  def withdraw = ???
+  /**
+   * Immediately places a withdrawal for a given currency, with no email confirmation.
+   * In order to use this method, the withdrawal privilege must be enabled for your API key
+   */
+  def withdraw = {
+    val method = PoloniexTradingApi.Method.Withdraw.value
+    ???
+  }
 
-  def returnFeeInfo = ???
+  /**
+   * If you are enrolled in the maker-taker fee schedule, returns your current trading fees and trailing 30-day volume in BTC.
+   * This information is updated once every 24 hours.
+   */
+  def returnFeeInfo = {
+    val method = PoloniexTradingApi.Method.ReturnFeeInfo.value
+    ???
+  }
 
-  def returnAvailableAccountBalances = ???
+  /**
+   * Returns your balances sorted by account.
+   * You may optionally specify the "account" POST parameter if you wish to fetch only the balances of one account.
+   */
+  def returnAvailableAccountBalances = {
+    val method = PoloniexTradingApi.Method.ReturnAvailableAccountBalances.value
+    ???
+  }
 
-  def returnTradableBalances = ???
+  /**
+   * Returns your current tradable balances for each currency in each market for which margin trading is enabled.
+   * Please note that these balances may vary continually with market conditions.
+   */
+  def returnTradableBalances = {
+    val method = PoloniexTradingApi.Method.ReturnTradableBalances.value
+    ???
+  }
 
-  def transferBalance = ???
+  /**
+   * Transfers funds from one account to another (e.g. from your exchange account to your margin account).
+   * Required POST parameters are "currency", "amount", "fromAccount", and "toAccount"
+   */
+  def transferBalance = {
+    val method = PoloniexTradingApi.Method.TransferBalance.value
+    ???
+  }
 
-  def returnMarginAccountSummary = ???
+  /**
+   * Returns a summary of your entire margin account.
+   * This is the same information you will find in the Margin Account section of the Margin Trading page, under the Markets list.
+   */
+  def returnMarginAccountSummary = {
+    val method = PoloniexTradingApi.Method.ReturnMarginAccountSummary.value
+    ???
+  }
 
-  def marginBuy = ???
+  /**
+   * Places a margin buy order in a given market.
+   * Required POST parameters are "currencyPair", "rate", and "amount".
+   * You may optionally specify a maximum lending rate using the "lendingRate" parameter.
+   * If successful, the method will return the order number and any trades immediately resulting from your order
+   */
+  def marginBuy = {
+    val method = PoloniexTradingApi.Method.MarginBuy.value
+    ???
+  }
 
-  def marginSell = ???
+  /**
+   * Places a margin sell order in a given market. Parameters and output are the same as for the marginBuy method.
+   */
+  def marginSell = {
+    val method = PoloniexTradingApi.Method.MarginSell.value
+    ???
+  }
 
-  def getMarginPosition = ???
+  /**
+   * Returns information about your margin position in a given market, specified by the "currencyPair" POST parameter.
+   * You may set "currencyPair" to "all" if you wish to fetch all of your margin positions at once.
+   * If you have no margin position in the specified market, "type" will be set to "none". "liquidationPrice" is an estimate, and does not necessarily represent the price at which an actual forced liquidation will occur.
+   * If you have no liquidation price, the value will be -1.
+   */
+  def getMarginPosition = {
+    val method = PoloniexTradingApi.Method.GetMarginPosition.value
+    ???
+  }
 
-  def closeMarginPosition = ???
+  /**
+   * Closes your margin position in a given market (specified by the "currencyPair" POST parameter) using a market order.
+   * This call will also return success if you do not have an open position in the specified market.
+   */
+  def closeMarginPosition = {
+    val method = PoloniexTradingApi.Method.CloseMarginPosition.value
+    ???
+  }
 
-  def createLoanOffer = ???
+  /**
+   * Creates a loan offer for a given currency.
+   * Required POST parameters are "currency", "amount", "duration", "autoRenew" (0 or 1), and "lendingRate".
+   */
+  def createLoanOffer = {
+    val method = PoloniexTradingApi.Method.CreateLoanOffer.value
+    ???
+  }
 
-  def cancelLoanOffer = ???
+  /**
+   * Cancels a loan offer specified by the "orderNumber" POST parameter.
+   */
+  def cancelLoanOffer = {
+    val method = PoloniexTradingApi.Method.CancelLoanOffer.value
+    ???
+  }
 
-  def returnOpenLoanOffers = ???
+  /**
+   * Returns your open loan offers for each currency.
+   */
+  def returnOpenLoanOffers = {
+    val method = PoloniexTradingApi.Method.ReturnOpenLoanOffers.value
+    ???
+  }
 
-  def returnActiveLoans = ???
+  /**
+   * Returns your active loans for each currency.
+   */
+  def returnActiveLoans = {
+    val method = PoloniexTradingApi.Method.ReturnActiveLoans.value
+    ???
+  }
 
-  def returnLendingHistory = ???
+  /**
+   * Returns your lending history within a time range specified by the "start" and "end" POST parameters as UNIX timestamps.
+   * "limit" may also be specified to limit the number of rows returned.
+   */
+  def returnLendingHistory = {
+    val method = PoloniexTradingApi.Method.ReturnLendingHistory.value
+    ???
+  }
 
-  def toggleAutoRenew = ???
+  /**
+   * Toggles the autoRenew setting on an active loan, specified by the "orderNumber" POST parameter.
+   * If successful, "message" will indicate the new autoRenew setting.
+   */
+  def toggleAutoRenew = {
+    val method = PoloniexTradingApi.Method.ToggleAutoRenew.value
+    ???
+  }
 
   private def parseHttpResponse[R <: PoloniexResponse](httpResponse: HttpResponse): R = ???
 
@@ -204,7 +322,7 @@ object PoloniexTradingApi {
     case object CloseMarginPosition            extends Method("closeMarginPosition")
     case object CreateLoanOffer                extends Method("createLoanOffer")
     case object CancelLoanOffer                extends Method("cancelLoanOffer")
-    case object ReturnOpenLoanOffer            extends Method("returnOpenLoanOffer")
+    case object ReturnOpenLoanOffers           extends Method("returnOpenLoanOffers")
     case object ReturnActiveLoans              extends Method("returnActiveLoans")
     case object ReturnLendingHistory           extends Method("returnLendingHistory")
     case object ToggleAutoRenew                extends Method("toggleAutoRenew")

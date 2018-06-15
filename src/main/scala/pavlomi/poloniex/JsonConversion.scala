@@ -1,20 +1,18 @@
 package pavlomi.poloniex
 
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import pavlomi.poloniex.domain.{PoloniexCurrency, PoloniexCurrencyPair}
-import pl.iterators.kebs.enums.KebsEnums
-import pl.iterators.kebs.json.KebsSpray
+import pl.iterators.kebs.json.{KebsEnumFormats, KebsSpray}
 import spray.json.{DefaultJsonProtocol, JsString, JsValue, JsonFormat}
 
 import scala.util.Try
 
-trait JsonConversion extends DefaultJsonProtocol with SprayJsonSupport with KebsSpray with KebsEnums {
+trait JsonConversion extends DefaultJsonProtocol with KebsSpray with KebsEnumFormats {
   implicit val poloniexCurrencyPairJsonFormat = new JsonFormat[PoloniexCurrencyPair] {
     override def read(json: JsValue): PoloniexCurrencyPair = json match {
       case JsString(poloniexCurrencyPairStr) =>
+        val currencies = poloniexCurrencyPairStr.split("_")
         Try {
-          val Seq(counter, base) = poloniexCurrencyPairStr.split("_").toSeq
-          PoloniexCurrencyPair(PoloniexCurrency.withValue(counter), PoloniexCurrency.withValue(base))
+          PoloniexCurrencyPair(PoloniexCurrency(currencies(0)), PoloniexCurrency(currencies(1)))
         }.getOrElse(??? /*deserializationError("Expected UUID format")*/ )
       case _ => ??? //deserializationError("Expected UUID format")
     }

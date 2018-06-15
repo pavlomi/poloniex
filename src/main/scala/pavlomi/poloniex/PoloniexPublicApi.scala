@@ -11,7 +11,7 @@ import enumeratum.values.{IntEnum, IntEnumEntry, StringEnum, StringEnumEntry}
 import pavlomi.poloniex.PoloniexPublicApi.Period
 import pavlomi.poloniex.domain.{PoloniexCurrency, PoloniexCurrencyPair}
 import pavlomi.poloniex.domain.dto._
-import pavlomi.poloniex.domain.dto.publicapi.{ReturnChartDataResponse, ReturnTicket, ReturnTicketResponse}
+import pavlomi.poloniex.domain.dto.publicapi._
 import spray.json._
 
 import scala.concurrent.duration._
@@ -33,8 +33,14 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
     val uri = Uri(POLONIEX_PUBLIC_API_URL).withQuery(Query("command" -> method))
 
     val httpRequest = HttpRequest(HttpMethods.GET, uri)
-
-    http().singleRequest(httpRequest).flatMap(r => parseHttpResponse[Map[PoloniexCurrencyPair, ReturnTicket]](r).map(_.map(ReturnTicketResponse)))
+    http().singleRequest(httpRequest).flatMap {
+      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
+        entity.toStrict(10 seconds).map { strict =>
+          println(strict.data.utf8String)
+          val response = strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, ReturnTicket]]
+          Right(ReturnTicketResponse(response))
+        }
+    }
   }
 
   /**
@@ -42,9 +48,19 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    *
    * Call: https://poloniex.com/public?command=return24hVolume
    */
-  def return24Volume() = {
-    val method = PoloniexPublicApi.Method.Return24Value.value
-    ???
+  def return24Volume(): PoloniexResponse[Return24VolumeResponse] = {
+    val method      = PoloniexPublicApi.Method.Return24hValue.value
+    val uri         = Uri(POLONIEX_PUBLIC_API_URL).withQuery(Query("command" -> method))
+    val httpRequest = HttpRequest(HttpMethods.GET, uri)
+
+    http().singleRequest(httpRequest).flatMap {
+      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
+        entity.toStrict(10 seconds).map { strict =>
+          println(strict.data.utf8String)
+          val response = strict.data.utf8String
+          Right(Return24VolumeResponse(response))
+        }
+    }
   }
 
   /**
@@ -54,11 +70,23 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    * Call: https://poloniex.com/public?command=returnOrderBook&currencyPair=BTC_NXT&depth=10
    */
   def returnOrderBook(
-    currencyPair: PoloniexCurrencyPair,
-    depth: Int
-  ) = {
-    val method = PoloniexPublicApi.Method.ReturnOrderBook.value
-    ???
+    currencyPair: Option[PoloniexCurrencyPair] = None,
+    depth: Long = 10
+  ): PoloniexResponse[OrderBookResponse] = {
+    val method                = PoloniexPublicApi.Method.ReturnOrderBook.value
+    val currencyPairParameter = currencyPair.map(_.toString).getOrElse("all")
+    val uri                   = Uri(POLONIEX_PUBLIC_API_URL).withQuery(Query("command" -> method, currencyPairParameter -> currencyPairParameter, "depth" -> depth.toString))
+    val httpRequest           = HttpRequest(HttpMethods.GET, uri)
+
+    http().singleRequest(httpRequest).flatMap {
+      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
+        entity.toStrict(10 seconds).map { strict =>
+          val response = currencyPair
+            .map(_ => strict.data.utf8String.parseJson.convertTo[ReturnOrderBook])
+            .getOrElse(ReturnOrderBookResponse(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, ReturnOrderBook]]))
+          Right(response)
+        }
+    }
   }
 
   /**
@@ -67,12 +95,26 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    * Call: https://poloniex.com/public?command=returnTradeHistory&currencyPair=BTC_NXT&start=1410158341&end=1410499372
    */
   def returnTradeHistory(
-    start: Instant,
-    end: Instant,
     currencyPair: PoloniexCurrencyPair,
-  ) = {
-    val method = PoloniexPublicApi.Method.ReturnTradeHistory.value
-    ???
+    start: Instant,
+    end: Instant
+  ): PoloniexResponse[PoloniexSuccessSeqResponse[ReturnTradeHistory]] = {
+    start.toEpochMilli
+    val method         = PoloniexPublicApi.Method.ReturnTradeHistory.value
+    val startTimestamp = instantTimestampToString(start)
+    val endTimestamp   = instantTimestampToString(end)
+
+    val query       = Query("command" -> method, currencyPairParameter -> currencyPair.toString, "start" -> startTimestamp, "end" -> endTimestamp)
+    val uri         = Uri(POLONIEX_PUBLIC_API_URL).withQuery(query)
+    val httpRequest = HttpRequest(HttpMethods.GET, uri)
+
+    http().singleRequest(httpRequest).flatMap {
+      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
+        entity.toStrict(10 seconds).map { strict =>
+          val tradeHistories = strict.data.utf8String.parseJson.convertTo[Seq[ReturnTradeHistory]]
+          Right(PoloniexSuccessSeqResponse(tradeHistories))
+        }
+    }
   }
 
   /**
@@ -81,26 +123,31 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    * Call: https://poloniex.com/public?command=returnChartData&currencyPair=BTC_XMR&start=1405699200&end=9999999999&period=14400
    */
   def returnChartData(
+    currencyPair: PoloniexCurrencyPair,
     start: Instant,
     end: Instant,
-    period: Period,
-    currencyPair: PoloniexCurrencyPair
-  ): Future[PoloniexSuccessSeqResponse[ReturnChartDataResponse]] = {
+    period: Period = Period.s14400
+  ): PoloniexResponse[PoloniexSuccessSeqResponse[ReturnChartDataResponse]] = {
     val method = PoloniexPublicApi.Method.ReturnChartData.value
     val uri = Uri(POLONIEX_PUBLIC_API_URL).withQuery(
       Query(
         "command"      -> method,
         "currencyPair" -> currencyPair.toString,
-        "start"        -> start.getEpochSecond.toString,
-        "end"          -> end.getEpochSecond.toString,
+        "start"        -> instantTimestampToString(start),
+        "end"          -> instantTimestampToString(end),
         "period"       -> period.value.toString
       )
     )
 
     val httpRequest = HttpRequest(HttpMethods.GET, uri)
 
-//    http().singleRequest(httpRequest).flatMap(parseHttpResponse(_))
-    ???
+    http().singleRequest(httpRequest).flatMap {
+      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
+        entity.toStrict(10 seconds).map { strict =>
+          val returnChartDataResponse = strict.data.utf8String.parseJson.convertTo[Seq[ReturnChartDataResponse]]
+          Right(PoloniexSuccessSeqResponse(returnChartDataResponse))
+        }
+    }
   }
 
   /**
@@ -123,26 +170,30 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
     ???
   }
 
-  private def parseHttpResponse[S](httpResponse: HttpResponse): Future[Either[PoloniexErrorResponse, S]] =
-    httpResponse match {
-      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
-        entity.toStrict(3000 millis).map(strict => Right(strict.data.utf8String.parseJson.convertTo[S]))
-      case HttpResponse(status, _, _, _) => Future.successful(Left(PoloniexErrorResponse(s"Poloniex response with status: ${status.intValue}")))
-    }
+//  private def parseHttpResponse[S](httpResponse: HttpResponse): Future[Either[PoloniexErrorResponse, S]] =
+//    httpResponse match {
+//      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
+//        entity.toStrict(3000 millis).map(strict => Right(strict.data.utf8String.parseJson.convertTo[S]))
+//      case HttpResponse(status, _, _, _) => Future.successful(Left(PoloniexErrorResponse(s"Poloniex response with status: ${status.intValue}")))
+//    }
 
 //  private def parseSeqHttpResponse[R <: PoloniexResponse](httpResponse: HttpResponse): Either[PoloniexFailureResponse, Seq[R]] =
 //    parseHttpResponse[Either[PoloniexFailureResponse, Seq[R]]](httpResponse)
 
+  private def instantTimestampToString(instant: Instant) = instant.toEpochMilli.toString.substring(0, 10)
+
   private def http() = Http()
 
   private val POLONIEX_PUBLIC_API_URL = "https://poloniex.com" + "/public"
+  private val currencyPairParameter   = "currencyPair"
+
 }
 
 object PoloniexPublicApi {
 
   sealed abstract class Method(val value: String) extends StringEnumEntry
   object Method extends StringEnum[Method] {
-    case object Return24Value      extends Method("return24Value")
+    case object Return24hValue     extends Method("return24hValue")
     case object ReturnTicker       extends Method("returnTicker")
     case object ReturnOrderBook    extends Method("returnOrderBook")
     case object ReturnTradeHistory extends Method("returnTradeHistory")
