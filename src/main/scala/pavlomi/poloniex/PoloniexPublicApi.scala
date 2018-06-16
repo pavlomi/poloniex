@@ -4,7 +4,7 @@ import java.time.Instant
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse, Uri}
+import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.Uri.Query
 import akka.stream.Materializer
 import enumeratum.values.{IntEnum, IntEnumEntry, StringEnum, StringEnumEntry}
@@ -20,26 +20,20 @@ import scala.concurrent.{ExecutionContext, Future}
 class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec: ExecutionContext) {
   import JsonConversion._
 
-  type PoloniexResponse[S <: PoloniexSuccessResponse] = Future[Either[PoloniexErrorResponse, S]]
+  type PoloniexResponseFut[S <: PoloniexSuccessResponse] = Future[Either[PoloniexErrorResponse, S]]
+  type PoloniexSeqResponseFut[T]                         = PoloniexResponseFut[PoloniexSuccessSeqResponse[T]]
 
   /**
    * Returns the ticker for all markets.
    *
    * Call: https://poloniex.com/public?command=returnTicker
    */
-  def returnTicket(): PoloniexResponse[ReturnTicketResponse] = {
+  def returnTicket(): PoloniexResponseFut[ReturnTicketResponse] = {
     val method = PoloniexPublicApi.Method.ReturnTicker.value
-
-    val uri = Uri(POLONIEX_PUBLIC_API_URL).withQuery(Query("command" -> method))
-
-    val httpRequest = HttpRequest(HttpMethods.GET, uri)
-    http().singleRequest(httpRequest).flatMap {
-      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
-        entity.toStrict(10 seconds).map { strict =>
-          println(strict.data.utf8String)
-          val response = strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, ReturnTicket]]
-          Right(ReturnTicketResponse(response))
-        }
+    val query  = Query("command" -> method)
+    httpRequestRun(query) { strict =>
+      val response = strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, ReturnTicket]]
+      ReturnTicketResponse(response)
     }
   }
 
@@ -48,18 +42,13 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    *
    * Call: https://poloniex.com/public?command=return24hVolume
    */
-  def return24Volume(): PoloniexResponse[Return24VolumeResponse] = {
-    val method      = PoloniexPublicApi.Method.Return24hValue.value
-    val uri         = Uri(POLONIEX_PUBLIC_API_URL).withQuery(Query("command" -> method))
-    val httpRequest = HttpRequest(HttpMethods.GET, uri)
-
-    http().singleRequest(httpRequest).flatMap {
-      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
-        entity.toStrict(10 seconds).map { strict =>
-          println(strict.data.utf8String)
-          val response = strict.data.utf8String
-          Right(Return24VolumeResponse(response))
-        }
+  def return24Volume(): PoloniexResponseFut[Return24VolumeResponse] = {
+    val method = PoloniexPublicApi.Method.Return24hValue.value
+    val query  = Query("command" -> method)
+    httpRequestRun(query) { strict =>
+      //TODO: to be continue implement
+      val response = strict.data.utf8String
+      Return24VolumeResponse(response)
     }
   }
 
@@ -69,23 +58,15 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    *
    * Call: https://poloniex.com/public?command=returnOrderBook&currencyPair=BTC_NXT&depth=10
    */
-  def returnOrderBook(
-    currencyPair: Option[PoloniexCurrencyPair] = None,
-    depth: Long = 10
-  ): PoloniexResponse[OrderBookResponse] = {
+  def returnOrderBook(currencyPair: Option[PoloniexCurrencyPair] = None, depth: Long = 10): PoloniexResponseFut[OrderBookResponse] = {
     val method                = PoloniexPublicApi.Method.ReturnOrderBook.value
     val currencyPairParameter = currencyPair.map(_.toString).getOrElse("all")
-    val uri                   = Uri(POLONIEX_PUBLIC_API_URL).withQuery(Query("command" -> method, currencyPairParameter -> currencyPairParameter, "depth" -> depth.toString))
-    val httpRequest           = HttpRequest(HttpMethods.GET, uri)
+    val query                 = Query("command" -> method, currencyPairParameter -> currencyPairParameter, "depth" -> depth.toString)
 
-    http().singleRequest(httpRequest).flatMap {
-      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
-        entity.toStrict(10 seconds).map { strict =>
-          val response = currencyPair
-            .map(_ => strict.data.utf8String.parseJson.convertTo[ReturnOrderBook])
-            .getOrElse(ReturnOrderBookResponse(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, ReturnOrderBook]]))
-          Right(response)
-        }
+    httpRequestRun(query) { strict =>
+      currencyPair
+        .map(_ => strict.data.utf8String.parseJson.convertTo[ReturnOrderBook])
+        .getOrElse(ReturnOrderBookResponse(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, ReturnOrderBook]]))
     }
   }
 
@@ -94,26 +75,15 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    *
    * Call: https://poloniex.com/public?command=returnTradeHistory&currencyPair=BTC_NXT&start=1410158341&end=1410499372
    */
-  def returnTradeHistory(
-    currencyPair: PoloniexCurrencyPair,
-    start: Instant,
-    end: Instant
-  ): PoloniexResponse[PoloniexSuccessSeqResponse[ReturnTradeHistory]] = {
-    start.toEpochMilli
+  def returnTradeHistory(currencyPair: PoloniexCurrencyPair, start: Instant, end: Instant): PoloniexSeqResponseFut[ReturnTradeHistory] = {
     val method         = PoloniexPublicApi.Method.ReturnTradeHistory.value
     val startTimestamp = instantTimestampToString(start)
     val endTimestamp   = instantTimestampToString(end)
 
-    val query       = Query("command" -> method, currencyPairParameter -> currencyPair.toString, "start" -> startTimestamp, "end" -> endTimestamp)
-    val uri         = Uri(POLONIEX_PUBLIC_API_URL).withQuery(query)
-    val httpRequest = HttpRequest(HttpMethods.GET, uri)
-
-    http().singleRequest(httpRequest).flatMap {
-      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
-        entity.toStrict(10 seconds).map { strict =>
-          val tradeHistories = strict.data.utf8String.parseJson.convertTo[Seq[ReturnTradeHistory]]
-          Right(PoloniexSuccessSeqResponse(tradeHistories))
-        }
+    val query = Query("command" -> method, currencyPairParameter -> currencyPair.toString, "start" -> startTimestamp, "end" -> endTimestamp)
+    httpRequestRun(query) { strict =>
+      val tradeHistories = strict.data.utf8String.parseJson.convertTo[Seq[ReturnTradeHistory]]
+      PoloniexSuccessSeqResponse(tradeHistories)
     }
   }
 
@@ -122,31 +92,21 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    *
    * Call: https://poloniex.com/public?command=returnChartData&currencyPair=BTC_XMR&start=1405699200&end=9999999999&period=14400
    */
-  def returnChartData(
-    currencyPair: PoloniexCurrencyPair,
-    start: Instant,
-    end: Instant,
-    period: Period = Period.s14400
-  ): PoloniexResponse[PoloniexSuccessSeqResponse[ReturnChartDataResponse]] = {
+  def returnChartData(currencyPair: PoloniexCurrencyPair,
+                      start: Instant,
+                      end: Instant,
+                      period: Period = Period.s14400): PoloniexSeqResponseFut[ReturnChartDataResponse] = {
     val method = PoloniexPublicApi.Method.ReturnChartData.value
-    val uri = Uri(POLONIEX_PUBLIC_API_URL).withQuery(
-      Query(
-        "command"      -> method,
-        "currencyPair" -> currencyPair.toString,
-        "start"        -> instantTimestampToString(start),
-        "end"          -> instantTimestampToString(end),
-        "period"       -> period.value.toString
-      )
+    val query = Query(
+      "command"      -> method,
+      "currencyPair" -> currencyPair.toString,
+      "start"        -> instantTimestampToString(start),
+      "end"          -> instantTimestampToString(end),
+      "period"       -> period.value.toString
     )
-
-    val httpRequest = HttpRequest(HttpMethods.GET, uri)
-
-    http().singleRequest(httpRequest).flatMap {
-      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
-        entity.toStrict(10 seconds).map { strict =>
-          val returnChartDataResponse = strict.data.utf8String.parseJson.convertTo[Seq[ReturnChartDataResponse]]
-          Right(PoloniexSuccessSeqResponse(returnChartDataResponse))
-        }
+    httpRequestRun(query) { strict =>
+      val returnChartDataResponse = strict.data.utf8String.parseJson.convertTo[Seq[ReturnChartDataResponse]]
+      PoloniexSuccessSeqResponse(returnChartDataResponse)
     }
   }
 
@@ -155,9 +115,13 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    *
    * Call: https://poloniex.com/public?command=returnCurrencies
    */
-  def returnCurrencies() = {
+  def returnCurrencies(): PoloniexResponseFut[ReturnCurrenciesResponse] = {
     val method = PoloniexPublicApi.Method.ReturnCurrencies.value
-    ???
+    val query  = Query("command" -> method)
+    httpRequestRun(query) { strict =>
+      val returnCurrencies = strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrency, ReturnCurrencies]]
+      ReturnCurrenciesResponse(returnCurrencies)
+    }
   }
 
   /**
@@ -165,20 +129,26 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    *
    * Call: https://poloniex.com/public?command=returnLoanOrders&currency=BTC
    */
-  def returnLoadOrders(currency: PoloniexCurrency) = {
-    val method = PoloniexPublicApi.Method.ReturnLoadOrders.value
-    ???
+  def returnLoanOrders(currency: PoloniexCurrency): PoloniexResponseFut[ReturnLoadOrdersResponse] = {
+    val method = PoloniexPublicApi.Method.ReturnLoanOrders.value
+    val query  = Query("command" -> method, "currency" -> currency.value)
+    httpRequestRun(query) { strict =>
+      strict.data.utf8String.parseJson.convertTo[ReturnLoadOrdersResponse]
+    }
   }
 
-//  private def parseHttpResponse[S](httpResponse: HttpResponse): Future[Either[PoloniexErrorResponse, S]] =
-//    httpResponse match {
-//      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
-//        entity.toStrict(3000 millis).map(strict => Right(strict.data.utf8String.parseJson.convertTo[S]))
-//      case HttpResponse(status, _, _, _) => Future.successful(Left(PoloniexErrorResponse(s"Poloniex response with status: ${status.intValue}")))
-//    }
+  private def parseHttpResponse[S <: PoloniexSuccessResponse](httpResponse: HttpResponse, f: HttpEntity.Strict => S): PoloniexResponseFut[S] =
+    httpResponse match {
+      case HttpResponse(status, _, entity, _) if status.isSuccess() => entity.toStrict(timeout).map(s => Right(f(s)))
+      case HttpResponse(_, _, entity, _) =>
+        entity.toStrict(timeout).map(s => Left(s.data.utf8String.parseJson.convertTo[PoloniexErrorResponse]))
+    }
 
-//  private def parseSeqHttpResponse[R <: PoloniexResponse](httpResponse: HttpResponse): Either[PoloniexFailureResponse, Seq[R]] =
-//    parseHttpResponse[Either[PoloniexFailureResponse, Seq[R]]](httpResponse)
+  private def httpRequestRun[S <: PoloniexSuccessResponse](query: Query)(f: HttpEntity.Strict => S): PoloniexResponseFut[S] = {
+    val uri         = Uri(POLONIEX_PUBLIC_API_URL).withQuery(query)
+    val httpRequest = HttpRequest(HttpMethods.GET, uri)
+    http().singleRequest(httpRequest).flatMap(parseHttpResponse[S](_, f))
+  }
 
   private def instantTimestampToString(instant: Instant) = instant.toEpochMilli.toString.substring(0, 10)
 
@@ -186,7 +156,7 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
 
   private val POLONIEX_PUBLIC_API_URL = "https://poloniex.com" + "/public"
   private val currencyPairParameter   = "currencyPair"
-
+  private val timeout                 = 3000.millis
 }
 
 object PoloniexPublicApi {
@@ -199,7 +169,7 @@ object PoloniexPublicApi {
     case object ReturnTradeHistory extends Method("returnTradeHistory")
     case object ReturnChartData    extends Method("returnChartData")
     case object ReturnCurrencies   extends Method("returnCurrencies")
-    case object ReturnLoadOrders   extends Method("returnLoadOrders")
+    case object ReturnLoanOrders   extends Method("returnLoanOrders")
 
     val values = findValues
   }

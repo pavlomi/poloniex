@@ -8,38 +8,43 @@ import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.stream.Materializer
 import enumeratum.values.{StringEnum, StringEnumEntry}
-import pavlomi.poloniex.domain.dto.{PoloniexFailureResponse, PoloniexResponse}
-import pavlomi.poloniex.domain.{PoloniexAPIKey, PoloniexSecret}
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
+import pavlomi.poloniex.domain.dto._
+import pavlomi.poloniex.domain.dto.tradingapi.{ReturnBalanceResponse, ReturnCompleteBalances, ReturnCompleteBalancesResponse}
+import pavlomi.poloniex.domain.{PoloniexAPIKey, PoloniexCurrency, PoloniexSecret}
+import spray.json._
 
 import scala.collection.immutable.Seq
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
 
 class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implicit actorSystem: ActorSystem, mac: Materializer, ec: ExecutionContext) {
+
+  type PoloniexResponseFut[S <: PoloniexSuccessResponse] = Future[Either[PoloniexErrorResponse, S]]
+  type PoloniexSeqResponseFut[T]                         = PoloniexResponseFut[PoloniexSuccessSeqResponse[T]]
 
   /**
    * Returns all of your available balances.
    */
-  def returnBalances(): Future[PoloniexResponse] = {
+  def returnBalances(): PoloniexResponseFut[ReturnBalanceResponse] = {
     val method   = PoloniexTradingApi.Method.ReturnBalances.value
     val formData = FormData(Map("nonce" -> getNonce.toString, "method" -> method))
 
-    val httpRequest = HttpRequest(
-      HttpMethods.POST,
-      POLONIEX_TRADING_API_URL,
-      getHeaders(formData),
-      formData.toEntity
-    )
-
-    http().singleRequest(httpRequest).map(parseHttpResponse _)
+    httpRequestRun(formData)(strict => ReturnBalanceResponse(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrency, String]]))
   }
 
   /**
    * Returns all of your balances, including available balance, balance on orders, and the estimated BTC value of your balance.
    * By default, this call is limited to your exchange account; set the "account" POST parameter to "all" to include your margin and lending accounts.
    */
-  def returnCompleteBalances() = {
-    val method = PoloniexTradingApi.Method.ReturnCompleteBalances.value
-    ???
+  def returnCompleteBalances(): PoloniexResponseFut[ReturnCompleteBalancesResponse] = {
+    val method   = PoloniexTradingApi.Method.ReturnCompleteBalances.value
+    val formData = FormData(Map("nonce" -> getNonce.toString, "method" -> method))
+
+    httpRequestRun(formData) { strict =>
+      ReturnCompleteBalancesResponse(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrency, ReturnCompleteBalances]])
+    }
   }
 
   /**
@@ -280,7 +285,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
 
   private def parseSeqHttpResponse[R <: PoloniexResponse](httpResponse: HttpResponse): Right[PoloniexFailureResponse, Seq[R]] = ???
 
-  private def getNonce = Instant.now.getEpochSecond * 100
+  private def getNonce = Instant.now.getEpochSecond
 
   private def getHeaders(formData: FormData): Seq[HttpHeader] = Seq(
     RawHeader("Sign", sign(formData.fields.toString)),
@@ -289,8 +294,36 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
 
   private def http() = Http()
 
-  private def sign(postData: String): String = ???
+  private def sign(postData: String): String = calculateHMAC(postData)
 
+  private def parseHttpResponse[S <: PoloniexSuccessResponse](httpResponse: HttpResponse, f: HttpEntity.Strict => S): PoloniexResponseFut[S] =
+    httpResponse match {
+      case HttpResponse(status, _, entity, _) if status.isSuccess() => entity.toStrict(timeout).map(s => Right(f(s)))
+      case HttpResponse(_, _, entity, _) =>
+        entity.toStrict(timeout).map(s => Left(s.data.utf8String.parseJson.convertTo[PoloniexErrorResponse]))
+    }
+
+  private def httpRequestRun[S <: PoloniexSuccessResponse](formData: FormData)(f: HttpEntity.Strict => S): PoloniexResponseFut[S] = {
+    val httpRequest = HttpRequest(
+      HttpMethods.POST,
+      POLONIEX_TRADING_API_URL,
+      getHeaders(formData),
+      formData.toEntity
+    )
+    http().singleRequest(httpRequest).flatMap(parseHttpResponse[S](_, f))
+  }
+
+  private def calculateHMAC(data: String): String = {
+    val secretKeySpec = new SecretKeySpec(secret.value.getBytes("UTF-8"), HMAC_SHA512)
+    val mac           = Mac.getInstance(HMAC_SHA512)
+    mac.init(secretKeySpec)
+    valueOf(mac.doFinal(data.getBytes("UTF-8")))
+  }
+
+  private def valueOf(bytes: Array[Byte]): String = bytes.map(b => String.format("%02X", new Integer(b & 0xff))).mkString
+
+  private val timeout                  = 3000.millis
+  private val HMAC_SHA512              = "HmacSHA512"
   private val POLONIEX_TRADING_API_URL = "https://poloniex.com" + "/tradingApi"
 }
 
