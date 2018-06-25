@@ -25,12 +25,9 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
   type PoloniexResponseFut[S <: PoloniexSuccessResponse] = Future[Either[PoloniexErrorResponse, S]]
   type PoloniexSeqResponseFut[T]                         = PoloniexResponseFut[PoloniexSuccessSeqResponse[T]]
 
-  /**
-   * Returns all of your available balances.
-   */
   def returnBalances(): PoloniexResponseFut[ReturnBalanceResponse] = {
-    val method   = PoloniexTradingApi.Method.ReturnBalances.value
-    val formData = FormData(Map("nonce" -> getNonce.toString, "method" -> method))
+    val command  = PoloniexTradingApi.Command.ReturnBalances.value
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command))
 
     httpRequestRun(formData)(strict => ReturnBalanceResponse(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrency, String]]))
   }
@@ -40,10 +37,11 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * By default, this call is limited to your exchange account; set the "account" POST parameter to "all" to include your margin and lending accounts.
    */
   def returnCompleteBalances(): PoloniexResponseFut[ReturnCompleteBalancesResponse] = {
-    val method   = PoloniexTradingApi.Method.ReturnCompleteBalances.value
-    val formData = FormData(Map("nonce" -> getNonce.toString, "method" -> method))
+    val command  = PoloniexTradingApi.Command.ReturnCompleteBalances.value
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command))
 
     httpRequestRun(formData) { strict =>
+      println(strict.data.utf8String)
       ReturnCompleteBalancesResponse(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrency, ReturnCompleteBalances]])
     }
   }
@@ -52,9 +50,9 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Returns all of your deposit addresses.
    */
   def returnDepositAddresses(): PoloniexResponseFut[ReturnDepositAddressesResponse] = {
-    val method = PoloniexTradingApi.Method.ReturnDepositAddresses.value
+    val command = PoloniexTradingApi.Command.ReturnDepositAddresses.value
 
-    val formData = FormData(Map("nonce" -> getNonce.toString, "method" -> method))
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command))
 
     httpRequestRun(formData) { strict =>
       ReturnDepositAddressesResponse(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrency, String]])
@@ -65,9 +63,9 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Generates a new deposit address for the currency specified by the "currency" POST parameter.
    */
   def generateNewAddress(): PoloniexResponseFut[GenerateNewAddressResponse] = {
-    val method = PoloniexTradingApi.Method.GenerateNewAddress.value
+    val command = PoloniexTradingApi.Command.GenerateNewAddress.value
 
-    val formData = FormData(Map("nonce" -> getNonce.toString, "method" -> method))
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command))
 
     httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[GenerateNewAddressResponse])
   }
@@ -76,9 +74,9 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Returns your deposit and withdrawal history within a range, specified by the "start" and "end" POST parameters, both of which should be given as UNIX timestamps.
    */
   def returnDepositsWithdrawals(): PoloniexResponseFut[ReturnDepositsWithdrawalsResponse] = {
-    val method = PoloniexTradingApi.Method.ReturnDepositsWithdrawals.value
+    val command = PoloniexTradingApi.Command.ReturnDepositsWithdrawals.value
 
-    val formData = FormData(Map("nonce" -> getNonce.toString, "method" -> method))
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command))
 
     httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[ReturnDepositsWithdrawalsResponse])
   }
@@ -88,12 +86,12 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Set "currencyPair" to "all" to return open orders for all markets.
    */
   def returnOpenOrders(currencyOpt: Option[PoloniexCurrency]): PoloniexResponseFut[ReturnOpenOrdersResponse] = {
-    val method = PoloniexTradingApi.Method.ReturnOpenOrders.value
+    val command = PoloniexTradingApi.Command.ReturnOpenOrders.value
 
     val formData = FormData(
       Map(
         "nonce"        -> getNonce.toString,
-        "method"       -> method,
+        "command"      -> command,
         "currencyPair" -> currencyOpt.map(_.value).getOrElse("all")
       )
     )
@@ -113,12 +111,12 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * If the "limit" parameter is not specified, no more than 500 entries will be returned.
    */
   def returnTradeHistory(currencyOpt: Option[PoloniexCurrency]): PoloniexResponseFut[ReturnTradeHistoryResponse] = {
-    val method = PoloniexTradingApi.Method.ReturnTradeHistory.value
+    val command = PoloniexTradingApi.Command.ReturnTradeHistory.value
 
     val formData = FormData(
       Map(
         "nonce"        -> getNonce.toString,
-        "method"       -> method,
+        "command"      -> command,
         "currencyPair" -> currencyOpt.map(_.value).getOrElse("all")
       )
     )
@@ -135,12 +133,12 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * If no trades for the order have occurred or you specify an order that does not belong to you, you will receive an error.
    */
   def returnOrderTrades(orderNumber: String): PoloniexResponseFut[ReturnOrderTradesResponse] = {
-    val method = PoloniexTradingApi.Method.ReturnOrderTrades.value
+    val command = PoloniexTradingApi.Command.ReturnOrderTrades.value
 
     val formData = FormData(
       Map(
         "nonce"       -> getNonce.toString,
-        "method"      -> method,
+        "command"     -> command,
         "orderNumber" -> orderNumber
       )
     )
@@ -151,16 +149,16 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
   /**
    * Places a limit buy order in a given market.
    * Required POST parameters are "currencyPair", "rate", and "amount".
-   * If successful, the method will return the order number.
+   * If successful, the command will return the order number.
    * TODO: optionally set implement
    */
   def buy(currencyPair: PoloniexCurrencyPair, rate: String, amount: BigDecimal): PoloniexResponseFut[BuyResponse] = {
-    val method = PoloniexTradingApi.Method.Buy.value
+    val command = PoloniexTradingApi.Command.Buy.value
 
     val formData = FormData(
       Map(
         "nonce"        -> getNonce.toString,
-        "method"       -> method,
+        "command"      -> command,
         "currencyPaid" -> currencyPair.toString,
         "rate"         -> rate,
         "amount"       -> amount.toString()
@@ -172,15 +170,15 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
 
   /**
    * Places a sell order in a given market.
-   * Parameters and output are the same as for the buy method.
+   * Parameters and output are the same as for the buy command.
    */
   def sell(currencyPair: PoloniexCurrencyPair, rate: String, amount: BigDecimal): PoloniexResponseFut[SellResponse] = {
-    val method = PoloniexTradingApi.Method.Sell.value
+    val command = PoloniexTradingApi.Command.Sell.value
 
     val formData = FormData(
       Map(
         "nonce"        -> getNonce.toString,
-        "method"       -> method,
+        "command"      -> command,
         "currencyPaid" -> currencyPair.toString,
         "rate"         -> rate,
         "amount"       -> amount.toString()
@@ -195,12 +193,12 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Required POST parameter is "orderNumber".
    */
   def cancelOrder(orderNumber: String): PoloniexResponseFut[CancelOrderResponse] = {
-    val method = PoloniexTradingApi.Method.CancelOrder.value
+    val command = PoloniexTradingApi.Command.CancelOrder.value
 
     val formData = FormData(
       Map(
         "nonce"       -> getNonce.toString,
-        "method"      -> method,
+        "command"     -> command,
         "orderNumber" -> orderNumber
       )
     )
@@ -212,10 +210,10 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Cancels an order and places a new one of the same type in a single atomic transaction, meaning either both operations will succeed or both will fail.
    */
   def moveOrder(orderNumber: String, rate: String, amountOpt: Option[BigDecimal]): PoloniexResponseFut[MoveOrderResponse] = {
-    val method = PoloniexTradingApi.Method.MoveOrder.value
+    val command = PoloniexTradingApi.Command.MoveOrder.value
     val data = Map(
       "nonce"       -> getNonce.toString,
-      "method"      -> method,
+      "command"     -> command,
       "orderNumber" -> orderNumber,
       "rate"        -> rate,
     )
@@ -227,15 +225,15 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
 
   /**
    * Immediately places a withdrawal for a given currency, with no email confirmation.
-   * In order to use this method, the withdrawal privilege must be enabled for your API key
+   * In order to use this command, the withdrawal privilege must be enabled for your API key
    */
   def withdraw(currency: PoloniexCurrency, amount: BigDecimal, address: String): PoloniexResponseFut[WithdrawResponse] = {
-    val method = PoloniexTradingApi.Method.Withdraw.value
+    val command = PoloniexTradingApi.Command.Withdraw.value
 
     val formData = FormData(
       Map(
         "nonce"    -> getNonce.toString,
-        "method"   -> method,
+        "command"  -> command,
         "currency" -> currency.value,
         "amount"   -> amount.toString,
         "address"  -> address
@@ -250,7 +248,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * This information is updated once every 24 hours.
    */
   def returnFeeInfo = {
-    val method = PoloniexTradingApi.Method.ReturnFeeInfo.value
+    val command = PoloniexTradingApi.Command.ReturnFeeInfo.value
     ???
   }
 
@@ -259,7 +257,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * You may optionally specify the "account" POST parameter if you wish to fetch only the balances of one account.
    */
   def returnAvailableAccountBalances = {
-    val method = PoloniexTradingApi.Method.ReturnAvailableAccountBalances.value
+    val command = PoloniexTradingApi.Command.ReturnAvailableAccountBalances.value
     ???
   }
 
@@ -268,7 +266,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Please note that these balances may vary continually with market conditions.
    */
   def returnTradableBalances = {
-    val method = PoloniexTradingApi.Method.ReturnTradableBalances.value
+    val command = PoloniexTradingApi.Command.ReturnTradableBalances.value
     ???
   }
 
@@ -277,7 +275,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Required POST parameters are "currency", "amount", "fromAccount", and "toAccount"
    */
   def transferBalance = {
-    val method = PoloniexTradingApi.Method.TransferBalance.value
+    val command = PoloniexTradingApi.Command.TransferBalance.value
     ???
   }
 
@@ -286,7 +284,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * This is the same information you will find in the Margin Account section of the Margin Trading page, under the Markets list.
    */
   def returnMarginAccountSummary = {
-    val method = PoloniexTradingApi.Method.ReturnMarginAccountSummary.value
+    val command = PoloniexTradingApi.Command.ReturnMarginAccountSummary.value
     ???
   }
 
@@ -294,18 +292,18 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Places a margin buy order in a given market.
    * Required POST parameters are "currencyPair", "rate", and "amount".
    * You may optionally specify a maximum lending rate using the "lendingRate" parameter.
-   * If successful, the method will return the order number and any trades immediately resulting from your order
+   * If successful, the command will return the order number and any trades immediately resulting from your order
    */
   def marginBuy = {
-    val method = PoloniexTradingApi.Method.MarginBuy.value
+    val command = PoloniexTradingApi.Command.MarginBuy.value
     ???
   }
 
   /**
-   * Places a margin sell order in a given market. Parameters and output are the same as for the marginBuy method.
+   * Places a margin sell order in a given market. Parameters and output are the same as for the marginBuy command.
    */
   def marginSell = {
-    val method = PoloniexTradingApi.Method.MarginSell.value
+    val command = PoloniexTradingApi.Command.MarginSell.value
     ???
   }
 
@@ -316,7 +314,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * If you have no liquidation price, the value will be -1.
    */
   def getMarginPosition = {
-    val method = PoloniexTradingApi.Method.GetMarginPosition.value
+    val command = PoloniexTradingApi.Command.GetMarginPosition.value
     ???
   }
 
@@ -325,7 +323,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * This call will also return success if you do not have an open position in the specified market.
    */
   def closeMarginPosition = {
-    val method = PoloniexTradingApi.Method.CloseMarginPosition.value
+    val command = PoloniexTradingApi.Command.CloseMarginPosition.value
     ???
   }
 
@@ -334,7 +332,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Required POST parameters are "currency", "amount", "duration", "autoRenew" (0 or 1), and "lendingRate".
    */
   def createLoanOffer = {
-    val method = PoloniexTradingApi.Method.CreateLoanOffer.value
+    val command = PoloniexTradingApi.Command.CreateLoanOffer.value
     ???
   }
 
@@ -342,7 +340,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Cancels a loan offer specified by the "orderNumber" POST parameter.
    */
   def cancelLoanOffer = {
-    val method = PoloniexTradingApi.Method.CancelLoanOffer.value
+    val command = PoloniexTradingApi.Command.CancelLoanOffer.value
     ???
   }
 
@@ -350,7 +348,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Returns your open loan offers for each currency.
    */
   def returnOpenLoanOffers = {
-    val method = PoloniexTradingApi.Method.ReturnOpenLoanOffers.value
+    val command = PoloniexTradingApi.Command.ReturnOpenLoanOffers.value
     ???
   }
 
@@ -358,7 +356,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Returns your active loans for each currency.
    */
   def returnActiveLoans = {
-    val method = PoloniexTradingApi.Method.ReturnActiveLoans.value
+    val command = PoloniexTradingApi.Command.ReturnActiveLoans.value
     ???
   }
 
@@ -367,7 +365,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * "limit" may also be specified to limit the number of rows returned.
    */
   def returnLendingHistory = {
-    val method = PoloniexTradingApi.Method.ReturnLendingHistory.value
+    val command = PoloniexTradingApi.Command.ReturnLendingHistory.value
     ???
   }
 
@@ -376,7 +374,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * If successful, "message" will indicate the new autoRenew setting.
    */
   def toggleAutoRenew = {
-    val method = PoloniexTradingApi.Method.ToggleAutoRenew.value
+    val command = PoloniexTradingApi.Command.ToggleAutoRenew.value
     ???
   }
 
@@ -413,13 +411,13 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
   }
 
   private def calculateHMAC(data: String): String = {
-    val secretKeySpec = new SecretKeySpec(secret.value.getBytes("UTF-8"), HMAC_SHA512)
+    val secretKeySpec = new SecretKeySpec(secret.value.getBytes, HMAC_SHA512)
     val mac           = Mac.getInstance(HMAC_SHA512)
     mac.init(secretKeySpec)
-    valueOf(mac.doFinal(data.getBytes("UTF-8")))
+    valueOf(mac.doFinal(data.getBytes()))
   }
 
-  private def valueOf(bytes: Array[Byte]): String = bytes.map(b => String.format("%02X", new Integer(b & 0xff))).mkString
+  private def valueOf(bytes: Array[Byte]): String = bytes.map("%02x" format _).mkString
 
   private val timeout                  = 3000.millis
   private val HMAC_SHA512              = "HmacSHA512"
@@ -428,36 +426,36 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
 
 object PoloniexTradingApi {
 
-  sealed abstract class Method(val value: String) extends StringEnumEntry
-  object Method extends StringEnum[Method] {
-    case object ReturnBalances                 extends Method("returnBalances")
-    case object ReturnCompleteBalances         extends Method("returnCompleteBalances ")
-    case object ReturnDepositAddresses         extends Method("returnDepositAddresses")
-    case object GenerateNewAddress             extends Method("generateNewAddress")
-    case object ReturnDepositsWithdrawals      extends Method("returnDepositsWithdrawals")
-    case object ReturnOpenOrders               extends Method("returnOpenOrders")
-    case object ReturnTradeHistory             extends Method("returnTradeHistory")
-    case object ReturnOrderTrades              extends Method("returnOrderTrades")
-    case object Buy                            extends Method("buy")
-    case object Sell                           extends Method("sell")
-    case object CancelOrder                    extends Method("cancelOrder")
-    case object MoveOrder                      extends Method("moveOrder")
-    case object Withdraw                       extends Method("withdraw")
-    case object ReturnFeeInfo                  extends Method("ReturnFeeInfo")
-    case object ReturnAvailableAccountBalances extends Method("returnAvailableAccountBalances")
-    case object ReturnTradableBalances         extends Method("returnTradableBalances")
-    case object TransferBalance                extends Method("transferBalance")
-    case object ReturnMarginAccountSummary     extends Method("returnMarginAccountSummary")
-    case object MarginBuy                      extends Method("marginBuy")
-    case object MarginSell                     extends Method("marginSell")
-    case object GetMarginPosition              extends Method("getMarginPosition")
-    case object CloseMarginPosition            extends Method("closeMarginPosition")
-    case object CreateLoanOffer                extends Method("createLoanOffer")
-    case object CancelLoanOffer                extends Method("cancelLoanOffer")
-    case object ReturnOpenLoanOffers           extends Method("returnOpenLoanOffers")
-    case object ReturnActiveLoans              extends Method("returnActiveLoans")
-    case object ReturnLendingHistory           extends Method("returnLendingHistory")
-    case object ToggleAutoRenew                extends Method("toggleAutoRenew")
+  sealed abstract class Command(val value: String) extends StringEnumEntry
+  object Command extends StringEnum[Command] {
+    case object ReturnBalances                 extends Command("returnBalances")
+    case object ReturnCompleteBalances         extends Command("returnCompleteBalances")
+    case object ReturnDepositAddresses         extends Command("returnDepositAddresses")
+    case object GenerateNewAddress             extends Command("generateNewAddress")
+    case object ReturnDepositsWithdrawals      extends Command("returnDepositsWithdrawals")
+    case object ReturnOpenOrders               extends Command("returnOpenOrders")
+    case object ReturnTradeHistory             extends Command("returnTradeHistory")
+    case object ReturnOrderTrades              extends Command("returnOrderTrades")
+    case object Buy                            extends Command("buy")
+    case object Sell                           extends Command("sell")
+    case object CancelOrder                    extends Command("cancelOrder")
+    case object MoveOrder                      extends Command("moveOrder")
+    case object Withdraw                       extends Command("withdraw")
+    case object ReturnFeeInfo                  extends Command("ReturnFeeInfo")
+    case object ReturnAvailableAccountBalances extends Command("returnAvailableAccountBalances")
+    case object ReturnTradableBalances         extends Command("returnTradableBalances")
+    case object TransferBalance                extends Command("transferBalance")
+    case object ReturnMarginAccountSummary     extends Command("returnMarginAccountSummary")
+    case object MarginBuy                      extends Command("marginBuy")
+    case object MarginSell                     extends Command("marginSell")
+    case object GetMarginPosition              extends Command("getMarginPosition")
+    case object CloseMarginPosition            extends Command("closeMarginPosition")
+    case object CreateLoanOffer                extends Command("createLoanOffer")
+    case object CancelLoanOffer                extends Command("cancelLoanOffer")
+    case object ReturnOpenLoanOffers           extends Command("returnOpenLoanOffers")
+    case object ReturnActiveLoans              extends Command("returnActiveLoans")
+    case object ReturnLendingHistory           extends Command("returnLendingHistory")
+    case object ToggleAutoRenew                extends Command("toggleAutoRenew")
 
     val values = findValues
   }

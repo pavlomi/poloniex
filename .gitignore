@@ -3,3 +3,4 @@
 /target
 /project/target
 /.idea
+/src/main/scala/pavlomi/poloniex/Boot.scala
