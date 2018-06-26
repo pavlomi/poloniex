@@ -123,8 +123,8 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
 
     httpRequestRun(formData) { strict =>
       currencyOpt
-        .map(_ => ReturnTradeHistorySingle(strict.data.utf8String.parseJson.convertTo[Seq[ReturnTradeHistory]]))
-        .getOrElse(ReturnTradeHistoryAll(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, Seq[ReturnTradeHistory]]]))
+        .map(_ => ReturnTradeHistoryAll(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, Seq[ReturnTradeHistory]]]))
+        .getOrElse(ReturnTradeHistorySingle(strict.data.utf8String.parseJson.convertTo[Seq[ReturnTradeHistory]]))
     }
   }
 
@@ -247,27 +247,54 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * If you are enrolled in the maker-taker fee schedule, returns your current trading fees and trailing 30-day volume in BTC.
    * This information is updated once every 24 hours.
    */
-  def returnFeeInfo = {
+  def returnFeeInfo(): PoloniexResponseFut[ReturnFeeInfoResponse] = {
     val command = PoloniexTradingApi.Command.ReturnFeeInfo.value
-    ???
+
+    val formData = FormData(
+      Map(
+        "nonce"   -> getNonce.toString,
+        "command" -> command
+      )
+    )
+
+    httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[ReturnFeeInfoResponse])
   }
 
   /**
    * Returns your balances sorted by account.
    * You may optionally specify the "account" POST parameter if you wish to fetch only the balances of one account.
    */
-  def returnAvailableAccountBalances = {
+  def returnAvailableAccountBalances(): PoloniexResponseFut[ReturnAvailableAccountBalances] = {
     val command = PoloniexTradingApi.Command.ReturnAvailableAccountBalances.value
-    ???
+
+    val formData = FormData(
+      Map(
+        "nonce"   -> getNonce.toString,
+        "command" -> command
+      )
+    )
+
+    httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[ReturnAvailableAccountBalances])
   }
 
   /**
    * Returns your current tradable balances for each currency in each market for which margin trading is enabled.
    * Please note that these balances may vary continually with market conditions.
    */
-  def returnTradableBalances = {
+  def returnTradableBalances(): PoloniexResponseFut[ReturnTradableBalanceResponse] = {
     val command = PoloniexTradingApi.Command.ReturnTradableBalances.value
-    ???
+
+    val formData = FormData(
+      Map(
+        "nonce"   -> getNonce.toString,
+        "command" -> command
+      )
+    )
+
+    httpRequestRun(formData) { strict =>
+      val tradableBalanceResponse = strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, Map[PoloniexCurrency, String]]]
+      ReturnTradableBalanceResponse(tradableBalanceResponse)
+    }
   }
 
   /**
@@ -378,10 +405,6 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
     ???
   }
 
-  private def parseHttpResponse[R <: PoloniexResponse](httpResponse: HttpResponse): R = ???
-
-  private def parseSeqHttpResponse[R <: PoloniexResponse](httpResponse: HttpResponse): Right[PoloniexFailureResponse, Seq[R]] = ???
-
   private def getNonce = Instant.now.getEpochSecond
 
   private def getHeaders(formData: FormData): Seq[HttpHeader] = Seq(
@@ -441,7 +464,7 @@ object PoloniexTradingApi {
     case object CancelOrder                    extends Command("cancelOrder")
     case object MoveOrder                      extends Command("moveOrder")
     case object Withdraw                       extends Command("withdraw")
-    case object ReturnFeeInfo                  extends Command("ReturnFeeInfo")
+    case object ReturnFeeInfo                  extends Command("returnFeeInfo")
     case object ReturnAvailableAccountBalances extends Command("returnAvailableAccountBalances")
     case object ReturnTradableBalances         extends Command("returnTradableBalances")
     case object TransferBalance                extends Command("transferBalance")

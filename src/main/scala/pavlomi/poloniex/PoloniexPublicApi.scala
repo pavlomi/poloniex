@@ -163,7 +163,7 @@ object PoloniexPublicApi {
 
   sealed abstract class Method(val value: String) extends StringEnumEntry
   object Method extends StringEnum[Method] {
-    case object Return24hValue     extends Method("return24hValue")
+    case object Return24hValue     extends Method("return24hVolume")
     case object ReturnTicker       extends Method("returnTicker")
     case object ReturnOrderBook    extends Method("returnOrderBook")
     case object ReturnTradeHistory extends Method("returnTradeHistory")
