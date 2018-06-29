@@ -1,3 +1,5 @@
 package pavlomi.poloniex.domain.dto.tradingapi
 
-case class CreateLoanOfferResponse(success: Int, message: String, orderID: BigInt)
+import pavlomi.poloniex.domain.dto.PoloniexSuccessResponse
+
+case class CreateLoanOfferResponse(success: Int, message: String, orderID: BigInt) extends PoloniexSuccessResponse

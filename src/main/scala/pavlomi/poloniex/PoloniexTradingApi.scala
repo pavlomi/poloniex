@@ -420,35 +420,51 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
   /**
    * Returns your active loans for each currency.
    */
-  def returnActiveLoans = {
-    val command = PoloniexTradingApi.Command.ReturnActiveLoans.value
-    ???
+  def returnActiveLoans(): PoloniexResponseFut[ReturnActiveLoansResponse] = {
+    val command  = PoloniexTradingApi.Command.ReturnActiveLoans.value
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command))
+
+    httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[ReturnActiveLoansResponse])
   }
 
   /**
    * Returns your lending history within a time range specified by the "start" and "end" POST parameters as UNIX timestamps.
    * "limit" may also be specified to limit the number of rows returned.
    */
-  def returnLendingHistory = {
+  def returnLendingHistory(start: Instant, end: Instant, limit: Int): PoloniexSeqResponseFut[ReturnLendingHistoryResponse] = {
     val command = PoloniexTradingApi.Command.ReturnLendingHistory.value
-    ???
+    val formData = FormData(
+      Map(
+        "nonce"   -> getNonce.toString,
+        "command" -> command,
+        "start"   -> instantTimestampToString(start),
+        "end"     -> instantTimestampToString(end),
+        "limit"   -> limit.toString
+      )
+    )
+
+    httpRequestRun(formData) { strict =>
+      val lendingHistoryResponse = strict.data.utf8String.parseJson.convertTo[Seq[ReturnLendingHistoryResponse]]
+      PoloniexSuccessSeqResponse(lendingHistoryResponse)
+    }
   }
 
   /**
    * Toggles the autoRenew setting on an active loan, specified by the "orderNumber" POST parameter.
    * If successful, "message" will indicate the new autoRenew setting.
    */
-  def toggleAutoRenew = {
-    val command = PoloniexTradingApi.Command.ToggleAutoRenew.value
-    ???
+  def toggleAutoRenew(orderNumber: String): PoloniexResponseFut[ToggleAutoRenewResponse] = {
+    val command  = PoloniexTradingApi.Command.ToggleAutoRenew.value
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command, "orderNumber" -> orderNumber))
+
+    httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[ToggleAutoRenewResponse])
   }
 
   private def getNonce = Instant.now.getEpochSecond
 
-  private def getHeaders(formData: FormData): Seq[HttpHeader] = Seq(
-    RawHeader("Sign", sign(formData.fields.toString)),
-    RawHeader("Key", APIKey.value)
-  )
+  private def getHeaders(formData: FormData): Seq[HttpHeader] = Seq(RawHeader("Sign", sign(formData.fields.toString)), RawHeader("Key", APIKey.value))
+
+  private def instantTimestampToString(instant: Instant) = instant.toEpochMilli.toString.substring(0, 10)
 
   private def http() = Http()
 
