@@ -30,7 +30,8 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    */
   def returnTicket(): PoloniexResponseFut[ReturnTicketResponse] = {
     val command = PoloniexPublicApi.Method.ReturnTicker.value
-    val query  = Query("command" -> command)
+    val query   = Query("command" -> command)
+
     httpRequestRun(query) { strict =>
       val response = strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, ReturnTicket]]
       ReturnTicketResponse(response)
@@ -40,11 +41,11 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
   /**
    * Returns the 24-hour volume for all markets, plus totals for primary currencies.
    *
-   * Call: https://poloniex.com/public?command=return24hVolume
+   * Call: https://pavlomi.poloniex.com/public?command=return24hVolume
    */
   def return24Volume(): PoloniexResponseFut[Return24VolumeResponse] = {
     val command = PoloniexPublicApi.Method.Return24hValue.value
-    val query  = Query("command" -> command)
+    val query   = Query("command" -> command)
     httpRequestRun(query) { strict =>
       //TODO: to be continue implement
       val response = strict.data.utf8String
@@ -56,16 +57,19 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    * Returns the order book for a given market, as well as a sequence number for use with the Push API and an indicator specifying whether the market is frozen.
    * You may set currencyPair to "all" to get the order books of all markets.
    *
-   * Call: https://poloniex.com/public?command=returnOrderBook&currencyPair=BTC_NXT&depth=10
+   * Call: https://pavlomi.poloniex.com/public?command=returnOrderBook&currencyPair=BTC_NXT&depth=10
    */
   def returnOrderBook(currencyPair: Option[PoloniexCurrencyPair] = None, depth: Long = 10): PoloniexResponseFut[OrderBookResponse] = {
-    val command                = PoloniexPublicApi.Method.ReturnOrderBook.value
+    val command               = PoloniexPublicApi.Method.ReturnOrderBook.value
     val currencyPairParameter = currencyPair.map(_.toString).getOrElse("all")
-    val query                 = Query("command" -> command, currencyPairParameter -> currencyPairParameter, "depth" -> depth.toString)
+    val query                 = Query("command" -> command, "currencyPair" -> currencyPairParameter, "depth" -> depth.toString)
 
     httpRequestRun(query) { strict =>
+
       currencyPair
-        .map(_ => strict.data.utf8String.parseJson.convertTo[ReturnOrderBook])
+        .map { _ =>
+          strict.data.utf8String.parseJson.convertTo[ReturnOrderBook]
+        }
         .getOrElse(ReturnOrderBookResponse(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, ReturnOrderBook]]))
     }
   }
@@ -76,7 +80,7 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
    * Call: https://poloniex.com/public?command=returnTradeHistory&currencyPair=BTC_NXT&start=1410158341&end=1410499372
    */
   def returnTradeHistory(currencyPair: PoloniexCurrencyPair, start: Instant, end: Instant): PoloniexSeqResponseFut[ReturnTradeHistory] = {
-    val command         = PoloniexPublicApi.Method.ReturnTradeHistory.value
+    val command        = PoloniexPublicApi.Method.ReturnTradeHistory.value
     val startTimestamp = instantTimestampToString(start)
     val endTimestamp   = instantTimestampToString(end)
 
@@ -113,11 +117,11 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
   /**
    * Returns information about currencies.
    *
-   * Call: https://poloniex.com/public?command=returnCurrencies
+   * Call: https://pavlomi.poloniex.com/public?command=returnCurrencies
    */
   def returnCurrencies(): PoloniexResponseFut[ReturnCurrenciesResponse] = {
     val command = PoloniexPublicApi.Method.ReturnCurrencies.value
-    val query  = Query("command" -> command)
+    val query   = Query("command" -> command)
     httpRequestRun(query) { strict =>
       val returnCurrencies = strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrency, ReturnCurrencies]]
       ReturnCurrenciesResponse(returnCurrencies)
@@ -127,11 +131,11 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
   /**
    * Returns the list of loan offers and demands for a given currency, specified by the "currency" GET parameter.
    *
-   * Call: https://poloniex.com/public?command=returnLoanOrders&currency=BTC
+   * Call: https://pavlomi.poloniex.com/public?command=returnLoanOrders&currency=BTC
    */
   def returnLoanOrders(currency: PoloniexCurrency): PoloniexResponseFut[ReturnLoadOrdersResponse] = {
     val command = PoloniexPublicApi.Method.ReturnLoanOrders.value
-    val query  = Query("command" -> command, "currency" -> currency.value)
+    val query   = Query("command" -> command, "currency" -> currency.value)
     httpRequestRun(query) { strict =>
       strict.data.utf8String.parseJson.convertTo[ReturnLoadOrdersResponse]
     }
@@ -156,7 +160,7 @@ class PoloniexPublicApi(implicit actorSystem: ActorSystem, mac: Materializer, ec
 
   private val POLONIEX_PUBLIC_API_URL = "https://poloniex.com" + "/public"
   private val currencyPairParameter   = "currencyPair"
-  private val timeout                 = 3000.millis
+  private val timeout                 = 3000.seconds
 }
 
 object PoloniexPublicApi {

@@ -1,5 +1,8 @@
 package pavlomi.poloniex.domain.dto.tradingapi
 
+import pavlomi.poloniex.domain.OrderNumber
 import pavlomi.poloniex.domain.dto.PoloniexSuccessResponse
 
-case class SellResponse(orderNumber: Long, resultingTrades: Seq[ResultingTrade]) extends PoloniexSuccessResponse
+trait SellResponse extends PoloniexSuccessResponse
+case class SellSuccessResponse(orderNumber: OrderNumber, resultingTrades: Seq[ResultingTrade]) extends SellResponse
+case class SellErrorResponse(error: String) extends SellResponse

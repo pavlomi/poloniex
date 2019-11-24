@@ -12,7 +12,7 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 import pavlomi.poloniex.domain.dto._
 import pavlomi.poloniex.domain.dto.tradingapi._
-import pavlomi.poloniex.domain.{PoloniexAPIKey, PoloniexCurrency, PoloniexCurrencyPair, PoloniexSecret}
+import pavlomi.poloniex.domain._
 import spray.json._
 
 import scala.collection.immutable.Seq
@@ -41,7 +41,6 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
     val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command))
 
     httpRequestRun(formData) { strict =>
-      println(strict.data.utf8String)
       ReturnCompleteBalancesResponse(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrency, ReturnCompleteBalances]])
     }
   }
@@ -61,9 +60,9 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
   /**
    * Generates a new deposit address for the currency specified by the "currency" POST parameter.
    */
-  def generateNewAddress(): PoloniexResponseFut[GenerateNewAddressResponse] = {
+  def generateNewAddress(currency: PoloniexCurrency): PoloniexResponseFut[GenerateNewAddressResponse] = {
     val command  = PoloniexTradingApi.Command.GenerateNewAddress.value
-    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command))
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command, "currency" -> currency.value))
 
     httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[GenerateNewAddressResponse])
   }
@@ -82,13 +81,13 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Returns your open orders for a given market, specified by the "currencyPair" POST parameter, e.g. "BTC_XCP".
    * Set "currencyPair" to "all" to return open orders for all markets.
    */
-  def returnOpenOrders(currencyOpt: Option[PoloniexCurrency]): PoloniexResponseFut[ReturnOpenOrdersResponse] = {
+  def returnOpenOrders(currencyOpt: Option[PoloniexCurrencyPair]): PoloniexResponseFut[ReturnOpenOrdersResponse] = {
     val command = PoloniexTradingApi.Command.ReturnOpenOrders.value
     val formData = FormData(
       Map(
         "nonce"        -> getNonce.toString,
         "command"      -> command,
-        "currencyPair" -> currencyOpt.map(_.value).getOrElse("all")
+        "currencyPair" -> currencyOpt.map(_.toString).getOrElse("all")
       )
     )
 
@@ -106,20 +105,33 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * You may optionally limit the number of entries returned using the "limit" parameter, up to a maximum of 10,000.
    * If the "limit" parameter is not specified, no more than 500 entries will be returned.
    */
-  def returnTradeHistory(currencyOpt: Option[PoloniexCurrency]): PoloniexResponseFut[ReturnTradeHistoryResponse] = {
+  def returnTradeHistory(
+    currencyOpt: Option[PoloniexCurrencyPair],
+    startOpt: Option[Instant],
+    endOpt: Option[Instant],
+    limitOpt: Option[Int]
+  ): PoloniexResponseFut[ReturnTradeHistoryResponse] = {
+    require(limitOpt.map(_ <= 10000).getOrElse(true))
     val command = PoloniexTradingApi.Command.ReturnTradeHistory.value
+
+    val startParam = startOpt.map(("start" -> convertInstantToTimestampString(_))).toMap
+
+    val endParam = endOpt.map(("end" -> convertInstantToTimestampString(_))).toMap
+
+    val limitParam = limitOpt.map(("limit" -> _.toString)).toMap
+
     val formData = FormData(
       Map(
         "nonce"        -> getNonce.toString,
         "command"      -> command,
-        "currencyPair" -> currencyOpt.map(_.value).getOrElse("all")
-      )
+        "currencyPair" -> currencyOpt.map(_.toString).getOrElse("all")
+      ) ++ startParam ++ endParam ++ limitParam
     )
 
     httpRequestRun(formData) { strict =>
       currencyOpt
-        .map(_ => ReturnTradeHistoryAll(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, Seq[ReturnTradeHistory]]]))
-        .getOrElse(ReturnTradeHistorySingle(strict.data.utf8String.parseJson.convertTo[Seq[ReturnTradeHistory]]))
+        .map(_ => ReturnTradeHistorySingle(strict.data.utf8String.parseJson.convertTo[Seq[ReturnTradeHistory]]))
+        .getOrElse(ReturnTradeHistoryAll(strict.data.utf8String.parseJson.convertTo[Map[PoloniexCurrencyPair, Seq[ReturnTradeHistory]]]))
     }
   }
 
@@ -127,11 +139,22 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * Returns all trades involving a given order, specified by the "orderNumber" POST parameter.
    * If no trades for the order have occurred or you specify an order that does not belong to you, you will receive an error.
    */
-  def returnOrderTrades(orderNumber: String): PoloniexResponseFut[ReturnOrderTradesResponse] = {
+  def returnOrderTrades(orderNumber: OrderNumber): PoloniexResponseFut[ReturnOrderTradesResponse] = {
     val command  = PoloniexTradingApi.Command.ReturnOrderTrades.value
-    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command, "orderNumber" -> orderNumber))
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command, "orderNumber" -> orderNumber.value.toString))
 
     httpRequestRun(formData)(strict => ReturnOrderTradesResponse(strict.data.utf8String.parseJson.convertTo[Seq[ReturnOrderTrades]]))
+  }
+
+  def returnOrderStatus(orderNumber: OrderNumber) = {
+    val command = PoloniexTradingApi.Command.ReturnOrderStatus.value
+
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command, "orderNumber" -> orderNumber.value.toString))
+
+    httpRequestRun(formData){strict =>
+    println(strict.data.utf8String)
+      strict.data.utf8String.parseJson.convertTo[ReturnOrderStatusResponse]
+    }
   }
 
   /**
@@ -140,47 +163,60 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
    * If successful, the command will return the order number.
    * TODO: optionally set implement
    */
-  def buy(currencyPair: PoloniexCurrencyPair, rate: String, amount: BigDecimal): PoloniexResponseFut[BuyResponse] = {
+  def buy(currencyPair: PoloniexCurrencyPair, rate: BigDecimal, amount: BigDecimal): PoloniexResponseFut[BuyResponse] = {
     val command = PoloniexTradingApi.Command.Buy.value
     val formData = FormData(
       Map(
         "nonce"        -> getNonce.toString,
         "command"      -> command,
-        "currencyPaid" -> currencyPair.toString,
-        "rate"         -> rate,
+        "currencyPair" -> currencyPair.toString,
+        "rate"         -> rate.toString(),
         "amount"       -> amount.toString()
       )
     )
 
-    httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[BuyResponse])
+    httpRequestRun(formData){ strict =>
+      val parsedJson = strict.data.utf8String.parseJson
+      parsedJson.asJsObject.fields.get("error") match {
+        case Some(_) => parsedJson.convertTo[BuyErrorResponse]
+        case None    => parsedJson.convertTo[BuySuccessResponse]
+      }
+    }
   }
 
   /**
    * Places a sell order in a given market.
    * Parameters and output are the same as for the buy command.
    */
-  def sell(currencyPair: PoloniexCurrencyPair, rate: String, amount: BigDecimal): PoloniexResponseFut[SellResponse] = {
+  def sell(currencyPair: PoloniexCurrencyPair, rate: BigDecimal, amount: BigDecimal): PoloniexResponseFut[SellResponse] = {
     val command = PoloniexTradingApi.Command.Sell.value
     val formData = FormData(
       Map(
         "nonce"        -> getNonce.toString,
         "command"      -> command,
-        "currencyPaid" -> currencyPair.toString,
-        "rate"         -> rate,
+        "currencyPair" -> currencyPair.toString,
+        "rate"         -> rate.toString(),
         "amount"       -> amount.toString()
       )
     )
 
-    httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[SellResponse])
+    httpRequestRun(formData){ strict =>
+      println(strict)
+      val parsedJson = strict.data.utf8String.parseJson
+      parsedJson.asJsObject.fields.get("error") match {
+        case Some(_) => parsedJson.convertTo[SellErrorResponse]
+        case None    => parsedJson.convertTo[SellSuccessResponse]
+      }
+    }
   }
 
   /**
    * Cancels an order you have placed in a given market.
    * Required POST parameter is "orderNumber".
    */
-  def cancelOrder(orderNumber: String): PoloniexResponseFut[CancelOrderResponse] = {
+  def cancelOrder(orderNumber: OrderNumber): PoloniexResponseFut[CancelOrderResponse] = {
     val command  = PoloniexTradingApi.Command.CancelOrder.value
-    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command, "orderNumber" -> orderNumber))
+    val formData = FormData(Map("nonce" -> getNonce.toString, "command" -> command, "orderNumber" -> orderNumber.toString()))
 
     httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[CancelOrderResponse])
   }
@@ -188,16 +224,18 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
   /**
    * Cancels an order and places a new one of the same type in a single atomic transaction, meaning either both operations will succeed or both will fail.
    */
-  def moveOrder(orderNumber: String, rate: String, amountOpt: Option[BigDecimal]): PoloniexResponseFut[MoveOrderResponse] = {
+  def moveOrder(orderNumber: OrderNumber, rate: String, amountOpt: Option[BigDecimal]): PoloniexResponseFut[MoveOrderResponse] = {
     val command = PoloniexTradingApi.Command.MoveOrder.value
+
+    val amount = amountOpt.map("amount" -> _.toString).toMap
     val data = Map(
       "nonce"       -> getNonce.toString,
       "command"     -> command,
-      "orderNumber" -> orderNumber,
-      "rate"        -> rate,
-    )
+      "orderNumber" -> orderNumber.toString,
+      "rate"        -> rate
+    ) ++ amount
 
-    val formData = FormData(amountOpt.map(amount => data + ("amount" -> amount.toString)).getOrElse(data))
+    val formData = FormData(data)
 
     httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[MoveOrderResponse])
   }
@@ -437,8 +475,8 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
       Map(
         "nonce"   -> getNonce.toString,
         "command" -> command,
-        "start"   -> instantTimestampToString(start),
-        "end"     -> instantTimestampToString(end),
+        "start"   -> convertInstantToTimestampString(start),
+        "end"     -> convertInstantToTimestampString(end),
         "limit"   -> limit.toString
       )
     )
@@ -460,11 +498,11 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
     httpRequestRun(formData)(_.data.utf8String.parseJson.convertTo[ToggleAutoRenewResponse])
   }
 
-  private def getNonce = Instant.now.getEpochSecond
+  private def getNonce = Instant.now.toEpochMilli
 
   private def getHeaders(formData: FormData): Seq[HttpHeader] = Seq(RawHeader("Sign", sign(formData.fields.toString)), RawHeader("Key", APIKey.value))
 
-  private def instantTimestampToString(instant: Instant) = instant.toEpochMilli.toString.substring(0, 10)
+  private def convertInstantToTimestampString(instant: Instant) = instant.toEpochMilli.toString.substring(0, 10)
 
   private def http() = Http()
 
@@ -472,7 +510,9 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
 
   private def parseHttpResponse[S <: PoloniexSuccessResponse](httpResponse: HttpResponse, f: HttpEntity.Strict => S): PoloniexResponseFut[S] =
     httpResponse match {
-      case HttpResponse(status, _, entity, _) if status.isSuccess() => entity.toStrict(timeout).map(s => Right(f(s)))
+      case HttpResponse(status, _, entity, _) if status.isSuccess() =>
+        println("Status code", status.intValue)
+        entity.toStrict(timeout).map(s => Right(f(s)))
       case HttpResponse(_, _, entity, _) =>
         entity.toStrict(timeout).map(s => Left(s.data.utf8String.parseJson.convertTo[PoloniexErrorResponse]))
     }
@@ -484,6 +524,7 @@ class PoloniexTradingApi(APIKey: PoloniexAPIKey, secret: PoloniexSecret)(implici
       getHeaders(formData),
       formData.toEntity
     )
+
     http().singleRequest(httpRequest).flatMap(parseHttpResponse[S](_, f))
   }
 
@@ -513,6 +554,7 @@ object PoloniexTradingApi {
     case object ReturnOpenOrders               extends Command("returnOpenOrders")
     case object ReturnTradeHistory             extends Command("returnTradeHistory")
     case object ReturnOrderTrades              extends Command("returnOrderTrades")
+    case object ReturnOrderStatus              extends Command("returnOrderStatus")
     case object Buy                            extends Command("buy")
     case object Sell                           extends Command("sell")
     case object CancelOrder                    extends Command("cancelOrder")

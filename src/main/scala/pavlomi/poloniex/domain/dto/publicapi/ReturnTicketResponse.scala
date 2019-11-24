@@ -7,10 +7,10 @@ case class ReturnTicketResponse(value: Map[PoloniexCurrencyPair, ReturnTicket]) 
 
 case class ReturnTicket(
   id: Int,
-  last: String,
-  lowestAsk: String,
-  highestBid: String,
-  percentChange: String,
+  last: BigDecimal,
+  lowestAsk: BigDecimal,
+  highestBid: BigDecimal,
+  percentChange: BigDecimal,
   baseVolume: String,
   quoteVolume: String,
   isFrozen: String,
