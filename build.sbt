@@ -1,6 +1,8 @@
 name := "poloniex"
 
-version := "0.1"
+organization := "pavlomi"
+
+version := "0.0.1"
 
 scalaVersion := "2.12.6"
 
